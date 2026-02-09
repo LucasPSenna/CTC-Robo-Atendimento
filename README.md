@@ -80,20 +80,26 @@ Projeto Robo Whats/
 
 ## Deploy no Render (ou outro PaaS)
 
-O robô usa Puppeteer/Chrome; em servidores como o Render o Chrome não vem instalado. Foi adicionada a dependência `puppeteer` e o código usa o Chromium baixado por ela quando a variável `RENDER` existe.
+### Opção 1: Deploy com Docker (recomendado)
 
-**No Render, configure:**
+O projeto inclui um **Dockerfile** que usa Chromium instalado pelo sistema. No Render é mais estável que depender do download do Puppeteer no build.
 
-1. **Variáveis de ambiente** (Environment):
-   - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` = `false`  
-     (assim o `npm install` baixa o Chromium no build)
-   - `PUPPETEER_CACHE_DIR` = `./cache/puppeteer`  
-     (obrigatório: o Chrome é baixado dentro do projeto e entra no deploy; sem isso o executável não é encontrado na hora de rodar)
+1. No Render, crie um **Web Service** e conecte o repositório.
+2. Em **Settings** → **Build & Deploy**:
+   - **Environment:** Docker
+   - O Render detecta o `Dockerfile` automaticamente.
+3. **Variáveis de ambiente:** adicione as do `.env` (por exemplo `NOME_CLUBE`, `NUMERO_ATENDIMENTO_HUMANO`). O Chromium já vem configurado na imagem.
+4. Faça o deploy. Na primeira vez, abra os **logs** e escaneie o QR Code com o WhatsApp (Aparelhos conectados).
 
+### Opção 2: Deploy nativo (Node)
+
+Se não usar Docker, configure:
+
+1. **Variáveis de ambiente:** `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` = `false`, `PUPPETEER_CACHE_DIR` = `./cache/puppeteer`.
 2. **Build Command:** `npm install`  
-3. **Start Command:** `node src/index.js`
+3. **Start Command:** `node src/index.js`  
 
-Na primeira vez após o deploy, abra os **logs** do serviço no Render: o QR Code do WhatsApp é exibido lá. Escaneie com o celular (WhatsApp → Aparelhos conectados). Depois a sessão fica salva no disco do serviço (persistido entre deploys no Render).
+O download do Chrome no build pode falhar por rede; nesse caso use a **Opção 1 (Docker)**.
 
 ---
 

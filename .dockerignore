@@ -1,0 +1,8 @@
+node_modules
+.git
+.env
+.wwebjs_auth
+.wwebjs_cache
+cache
+*.log
+README.md
