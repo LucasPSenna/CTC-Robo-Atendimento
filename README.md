@@ -78,6 +78,25 @@ Projeto Robo Whats/
 - **Nome do clube e número de escalação**: `.env` ou `src/config.js`.
 - **Quantas vezes “não entendi” antes de escalar**: em `src/escalacao.js`, altere `MAX_NAO_ENTENDIDO_PARA_ESCALAR` (padrão: 2).
 
+## Uso em VPS Linux
+
+Para rodar em um servidor Linux (Ubuntu, Debian, etc.):
+
+1. **Instale Node.js 18+ e Chromium** no servidor (ex.: `sudo apt install nodejs chromium-browser`).
+2. **Clone o repositório**, rode `npm install`, crie e edite o `.env`.
+3. **Primeira vez:** execute `npm start`, escaneie o QR Code no terminal e pare com `Ctrl+C`.
+4. **Em segundo plano:** use **PM2** (`pm2 start src/index.js --name ctc-robo`) ou o **systemd** (arquivo em `deploy/ctc-robo-whats.service`).
+
+O robô detecta Chromium em `/usr/bin/chromium` ou `/usr/bin/chromium-browser` automaticamente. Para outro caminho, defina no `.env`:
+
+```bash
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+```
+
+Instruções detalhadas: **[deploy/README-VPS.md](deploy/README-VPS.md)**.
+
+---
+
 ## Deploy no Render (ou outro PaaS)
 
 ### Opção 1: Deploy com Docker (recomendado)

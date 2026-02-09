@@ -16,10 +16,37 @@ Escolha uma opção digitando o *número* ou a *palavra*:
 4️⃣ *DOCUMENTOS* - Documentos necessários (CR, etc.)
 5️⃣ *REGRAS* - Regras e normas do clube
 6️⃣ *LOCALIZAÇÃO* - Endereço e como chegar
-7️⃣ *CONTATO* - Falar com atendente humano
+7️⃣ *SOLICITAÇÃO DE DOCUMENTOS* - Solicitar ou enviar documentos
+8️⃣ *CONTATO* - Falar com atendente humano
 
 Digite *MENU* a qualquer momento para ver este menu novamente.
 `.trim();
+
+/** Opções para o menu em lista (seleção por toque). IDs devem bater com as chaves de RESPOSTAS. */
+const MENU_LIST_OPCOES = {
+  body: `Escolha uma opção abaixo para *${nomeClube}*:`,
+  buttonText: '📋 Ver opções',
+  title: `${nomeClube} - Assistente`,
+  footer: 'Toque no botão e selecione uma opção.',
+  sections: [
+    {
+      title: 'Atendimento',
+      rows: [
+        { id: 'horarios', title: '🕐 Horários', description: 'Horário de funcionamento' },
+        { id: 'precos', title: '💰 Preços', description: 'Valores e planos' },
+        { id: 'agendar', title: '📅 Agendar', description: 'Visita ou aula de tiro' },
+        { id: 'documentos', title: '📋 Documentos', description: 'O que trazer (CR, etc.)' },
+        { id: 'regras', title: '📜 Regras', description: 'Normas do clube' },
+        { id: 'localizacao', title: '📍 Localização', description: 'Endereço e como chegar' },
+        { id: 'solicitacao_documentos', title: '📄 Solicitação de documentos', description: 'Solicitar ou enviar documentos' },
+        { id: 'atendente', title: '👤 Falar com atendente', description: 'Atendimento humano' },
+      ],
+    },
+  ],
+};
+
+/** IDs válidos de seleção (lista/botão) para resposta direta */
+const OPCOES_SELECAO_IDS = ['horarios', 'precos', 'agendar', 'documentos', 'regras', 'localizacao', 'solicitacao_documentos', 'atendente'];
 
 const RESPOSTAS = {
   horarios: `
@@ -40,7 +67,6 @@ _Consulte sempre antes de vir; horários podem variar em feriados._
 • Filiação: R$ 750,00
 • Renovação de filiação: R$ 650,00
 • Curso de Inicialização no Tiro: R$ 350,00
-• Aluguel de armas: R$ XX,00
 
 _Pagamento em dinheiro, PIX ou cartão._
 `.trim(),
@@ -69,6 +95,17 @@ Para frequentar o clube você precisa de:
 • Menores: autorização e acompanhamento do responsável
 
 _Na primeira visita traga RG e, se tiver, o CR._
+`.trim(),
+
+  solicitacao_documentos: `
+📄 *Solicitação de documentos*
+
+Para solicitar ou enviar documentos (renovação de CR, atestados, etc.):
+
+1. Digite *CONTATO* ou *8* para falar com um atendente, que irá orientar o envio.
+2. Ou compareça ao clube no horário de atendimento com os documentos em mãos.
+
+_Guarde cópias dos documentos enviados para seu controle._
 `.trim(),
 
   regras: `
@@ -133,6 +170,11 @@ const PALAVRAS_CHAVE = {
   documentos: 'documentos',
   cr: 'documentos',
   certificado: 'documentos',
+  solicitacao: 'solicitacao_documentos',
+  solicitacao_documentos: 'solicitacao_documentos',
+  solicitar: 'solicitacao_documentos',
+  'solicitar documentos': 'solicitacao_documentos',
+  'enviar documentos': 'solicitacao_documentos',
   regras: 'regras',
   normas: 'regras',
   localizacao: 'localizacao',
@@ -149,6 +191,8 @@ const PALAVRAS_CHAVE = {
 
 module.exports = {
   MENU_PRINCIPAL,
+  MENU_LIST_OPCOES,
+  OPCOES_SELECAO_IDS,
   RESPOSTAS,
   PALAVRAS_CHAVE,
 };

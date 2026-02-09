@@ -1,0 +1,26 @@
+# Serviço systemd para o robô WhatsApp (VPS Linux)
+# Uso:
+#   1. cp deploy/ctc-robo-whats.service /etc/systemd/system/
+#   2. Edite o caminho em WorkingDirectory= e User=
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable ctc-robo-whats
+#   5. sudo systemctl start ctc-robo-whats
+# Logs: journalctl -u ctc-robo-whats -f
+
+[Unit]
+Description=CTC Robô Atendimento WhatsApp - Clube de Tiro
+After=network.target
+
+[Service]
+Type=simple
+User=seu_usuario
+WorkingDirectory=/home/seu_usuario/CTC-Robo-Atendimento
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

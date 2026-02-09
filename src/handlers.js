@@ -2,7 +2,7 @@
  * Tratamento de mensagens recebidas - responde com o menu e as opções do clube.
  */
 
-const { MENU_PRINCIPAL, RESPOSTAS, PALAVRAS_CHAVE } = require('./conteudo');
+const { MENU_PRINCIPAL, RESPOSTAS, PALAVRAS_CHAVE, OPCOES_SELECAO_IDS } = require('./conteudo');
 const config = require('./config');
 const {
   pediuAtendimentoHumano,
@@ -36,7 +36,8 @@ function opcaoPorNumero(texto) {
     '4': 'documentos',
     '5': 'regras',
     '6': 'localizacao',
-    '7': 'atendente',
+    '7': 'solicitacao_documentos',
+    '8': 'atendente',
   };
   return map[n] || null;
 }
@@ -47,6 +48,9 @@ function opcaoPorNumero(texto) {
 function encontrarResposta(texto) {
   const norm = normalizar(texto);
   if (!norm) return null;
+
+  // Seleção por lista/botão (ID retornado pelo WhatsApp)
+  if (OPCOES_SELECAO_IDS.includes(norm)) return norm;
 
   const porNumero = opcaoPorNumero(texto);
   if (porNumero) return porNumero;

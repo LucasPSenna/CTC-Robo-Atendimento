@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 
 // No Render, o cache do Puppeteer precisa ficar DENTRO do projeto para ir no deploy.
 // Configure no Render: PUPPETEER_CACHE_DIR=./cache/puppeteer
@@ -14,8 +15,11 @@ if (process.env.RENDER && !process.env.PUPPETEER_CACHE_DIR) {
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { processarMensagem, getNumeroAtendimentoHumano } = require('./handlers');
+const { MENU_PRINCIPAL } = require('./conteudo');
+const { estaEmHorarioAtendimento } = require('./horarioAtendimento');
+const config = require('./config');
 
-// Chrome/Chromium: prioridade para variável de ambiente (ex.: Docker); senão usa o do Puppeteer
+// Chrome/Chromium: 1) PUPPETEER_EXECUTABLE_PATH (Docker/VPS) 2) Chromium do sistema (VPS) 3) Puppeteer (Render)
 const puppeteerConfig = {
   headless: true,
   args: [
@@ -27,6 +31,18 @@ const puppeteerConfig = {
 };
 if (process.env.PUPPETEER_EXECUTABLE_PATH) {
   puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+} else if (process.platform === 'linux') {
+  const paths = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable'];
+  const found = paths.find((p) => { try { return fs.existsSync(p); } catch (_) { return false; } });
+  if (found) puppeteerConfig.executablePath = found;
+  else if (process.env.RENDER) {
+    try {
+      const puppeteer = require('puppeteer');
+      puppeteerConfig.executablePath = puppeteer.executablePath();
+    } catch (e) {
+      console.warn('Puppeteer não encontrado; usando Chrome padrão do sistema.');
+    }
+  }
 } else if (process.env.RENDER) {
   try {
     const puppeteer = require('puppeteer');
@@ -41,12 +57,32 @@ const client = new Client({
   puppeteer: puppeteerConfig,
 });
 
-/** Log de mensagem enviada: destinatário e prévia do conteúdo */
+/** Extrai número real para log (evita mostrar @c.us, @lid, etc.) */
+function numeroParaLog(contactOuId) {
+  if (!contactOuId) return '?';
+  if (typeof contactOuId === 'object' && contactOuId !== null) {
+    const n = contactOuId.number || (contactOuId.id && contactOuId.id.user);
+    if (n) return n;
+    const s = contactOuId.id && contactOuId.id._serialized;
+    if (s) return s.replace(/@.*$/, '');
+  }
+  const s = String(contactOuId);
+  return s.replace(/@.*$/, '') || s;
+}
+
+/** Log de mensagem enviada: destinatário (número real) e prévia do conteúdo */
 function logEnvio(destinatario, conteudo, tipo = 'resposta') {
+  const num = typeof destinatario === 'object' ? numeroParaLog(destinatario) : (typeof destinatario === 'string' && destinatario.includes('@') ? destinatario.replace(/@.*$/, '') : String(destinatario || '?'));
   const texto = typeof conteudo === 'string' ? conteudo : '[mídia]';
   const preview = texto.replace(/\n/g, ' ').slice(0, 60);
   const quando = new Date().toISOString();
-  console.log(`[${quando}] ENVIADO (${tipo}) para ${destinatario}: "${preview}${texto.length > 60 ? '...' : ''}"`);
+  console.log(`[${quando}] ENVIADO (${tipo}) para ${num}: "${preview}${texto.length > 60 ? '...' : ''}"`);
+}
+
+/** Envia o menu em texto. (Lista interativa não é suportada: [LT01] Whatsapp business can't send this yet) */
+async function enviarMenu(chatId, numeroParaLogDestino) {
+  await client.sendMessage(chatId, MENU_PRINCIPAL);
+  logEnvio(numeroParaLogDestino || chatId, MENU_PRINCIPAL, 'menu');
 }
 
 client.on('qr', (qr) => {
@@ -83,20 +119,38 @@ client.on('message', async (msg) => {
     return;
   }
 
-  // Ignora apenas mídia sem legenda (opcional: pode tratar áudio depois)
-  const texto = typeof body === 'string' ? body.trim() : '';
-  if (!texto && !msg.hasMedia) {
-    const { processarMensagem: processar } = require('./handlers');
-    const { texto: resp } = processar('menu', chatId);
-    await msg.reply(resp);
-    logEnvio(from, resp, 'menu');
+  // Número real do contato para os logs (evita 110178829627629@lid etc.)
+  let contact = null;
+  try {
+    contact = await chat.getContact();
+  } catch (_) {}
+  const numeroLog = contact ? numeroParaLog(contact) : numeroParaLog(from);
+
+  // Texto da mensagem: prioridade para seleção (lista/botão), depois corpo da mensagem
+  const texto = (msg.selectedRowId || msg.selectedButtonId || body || '').trim();
+  const textoStr = typeof texto === 'string' ? texto : '';
+
+  if (!textoStr && !msg.hasMedia) {
+    await enviarMenu(chatId, numeroLog);
     return;
   }
 
   try {
-    const { texto: resposta, escalarParaHumano } = processarMensagem(texto, chatId);
-    await msg.reply(resposta);
-    logEnvio(from, resposta, 'resposta');
+    const { texto: resposta, escalarParaHumano } = processarMensagem(textoStr, chatId);
+
+    // Só aplica horário de atendimento quando a opção precisa de atendimento humano
+    if (escalarParaHumano && !estaEmHorarioAtendimento()) {
+      await msg.reply(config.mensagemForaHorario);
+      logEnvio(numeroLog, config.mensagemForaHorario, 'fora do horário');
+      return;
+    }
+
+    if (resposta === MENU_PRINCIPAL) {
+      await enviarMenu(chatId, numeroLog);
+    } else {
+      await msg.reply(resposta);
+      logEnvio(numeroLog, resposta, 'resposta');
+    }
 
     if (escalarParaHumano && getNumeroAtendimentoHumano()) {
       const numero = getNumeroAtendimentoHumano().replace(/\D/g, '');
@@ -104,7 +158,7 @@ client.on('message', async (msg) => {
       const msgEscalacao = `🔔 *Escalação para atendimento humano*\n\nContato: ${from}\nÚltima mensagem: "${texto.substring(0, 200)}"\n\nVerifique o WhatsApp para atender.`;
       try {
         await client.sendMessage(destino, msgEscalacao);
-        logEnvio(destino, msgEscalacao, 'escalação');
+        logEnvio(numero, msgEscalacao, 'escalação');
       } catch (e) {
         console.error('Erro ao notificar atendente:', e.message);
       }
@@ -114,7 +168,7 @@ client.on('message', async (msg) => {
     try {
       const msgErro = 'Desculpe, ocorreu um erro. Por favor, tente novamente em instantes ou digite MENU para ver as opções.';
       await msg.reply(msgErro);
-      logEnvio(from, msgErro, 'erro');
+      logEnvio(numeroLog, msgErro, 'erro');
     } catch (_) {}
   }
 });
