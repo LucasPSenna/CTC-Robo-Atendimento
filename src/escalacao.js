@@ -21,6 +21,13 @@ function pediuAtendimentoHumano(texto) {
 }
 
 /**
+ * Retorna o contador atual de "não entendi" para o chat (antes de incrementar)
+ */
+function getContadorNaoEntendi(chatId) {
+  return contadorNaoEntendi.get(chatId) || 0;
+}
+
+/**
  * Registra que o bot não entendeu e retorna se já deve escalar
  */
 function registrarNaoEntendi(chatId) {
@@ -50,6 +57,7 @@ function getNumeroAtendimentoHumano() {
 
 module.exports = {
   pediuAtendimentoHumano,
+  getContadorNaoEntendi,
   registrarNaoEntendi,
   zerarContadorNaoEntendi,
   obterMensagemEscalacao,

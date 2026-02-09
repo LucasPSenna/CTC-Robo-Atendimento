@@ -3,7 +3,7 @@
  * Todas as mensagens são em português para o atendimento.
  */
 
-const { nomeClube } = require('./config');
+const { nomeClube, pixCnpj, provas: nomesProvas } = require('./config');
 
 const MENU_PRINCIPAL = `
 🎯 *${nomeClube}* - Assistente Virtual
@@ -17,9 +17,14 @@ Escolha uma opção digitando o *número* ou a *palavra*:
 5️⃣ *REGRAS* - Regras e normas do clube
 6️⃣ *LOCALIZAÇÃO* - Endereço e como chegar
 7️⃣ *SOLICITAÇÃO DE DOCUMENTOS* - Solicitar ou enviar documentos
-8️⃣ *CONTATO* - Falar com atendente humano
+8️⃣ *RENOVAÇÃO* - Pagar renovação (R$ 650 - PIX ou cartão)
+9️⃣ *FILIAÇÃO* - Pagar filiação (R$ 750 - PIX ou cartão)
+🔟 *CONTATO* - Falar com atendente humano
+1️⃣1️⃣ *PROVAS* - Provas e competições
 
 Digite *MENU* a qualquer momento para ver este menu novamente.
+
+_Bot desenvolvido por Lucas Senna_
 `.trim();
 
 /** Opções para o menu em lista (seleção por toque). IDs devem bater com as chaves de RESPOSTAS. */
@@ -39,14 +44,17 @@ const MENU_LIST_OPCOES = {
         { id: 'regras', title: '📜 Regras', description: 'Normas do clube' },
         { id: 'localizacao', title: '📍 Localização', description: 'Endereço e como chegar' },
         { id: 'solicitacao_documentos', title: '📄 Solicitação de documentos', description: 'Solicitar ou enviar documentos' },
+        { id: 'renovacao', title: '🔄 Renovação', description: 'Pagar renovação R$ 650 (PIX ou cartão)' },
+        { id: 'filiacao', title: '💳 Filiação', description: 'Pagar filiação R$ 750 (PIX ou cartão)' },
         { id: 'atendente', title: '👤 Falar com atendente', description: 'Atendimento humano' },
+        { id: 'provas', title: '🏆 Provas', description: 'Provas e competições' },
       ],
     },
   ],
 };
 
 /** IDs válidos de seleção (lista/botão) para resposta direta */
-const OPCOES_SELECAO_IDS = ['horarios', 'precos', 'agendar', 'documentos', 'regras', 'localizacao', 'solicitacao_documentos', 'atendente'];
+const OPCOES_SELECAO_IDS = ['horarios', 'precos', 'agendar', 'documentos', 'regras', 'localizacao', 'solicitacao_documentos', 'renovacao', 'filiacao', 'atendente', 'provas'];
 
 const RESPOSTAS = {
   horarios: `
@@ -102,10 +110,28 @@ _Na primeira visita traga RG e, se tiver, o CR._
 
 Para solicitar ou enviar documentos (renovação de CR, atestados, etc.):
 
-1. Digite *CONTATO* ou *8* para falar com um atendente, que irá orientar o envio.
+1. Digite *CONTATO* ou *10* para falar com um atendente, que irá orientar o envio.
 2. Ou compareça ao clube no horário de atendimento com os documentos em mãos.
 
 _Guarde cópias dos documentos enviados para seu controle._
+`.trim(),
+
+  // Renovação e Filiação: com link ativo usa getMensagemPagamento (infinitepay.js); sem link usa o texto abaixo
+  renovacao: `
+🔄 *Renovação de filiação* – R$ 650,00
+
+💳 *Chave PIX (CNPJ):*
+\`${pixCnpj}\`
+
+Realize o pagamento e *envie o comprovante neste chat* para confirmarmos sua renovação.
+`.trim(),
+  filiacao: `
+💳 *Filiação* – R$ 750,00
+
+💳 *Chave PIX (CNPJ):*
+\`${pixCnpj}\`
+
+Realize o pagamento e *envie o comprovante neste chat* para confirmarmos sua filiação.
 `.trim(),
 
   regras: `
@@ -136,6 +162,22 @@ Você será atendido por um de nossos atendentes em breve.
 
 Obrigado pelo contato!
 `.trim(),
+
+  provas: (() => {
+    const p = nomesProvas;
+    return `
+🏆 *Provas e competições*
+
+• *${p.internas}*
+• *${p.calibre}*
+• *${p.cbtt}*
+• *${p.w2c}*
+• *${p.linade}*
+• *${p.federacaoPaulista}*
+
+Para datas, regulamentos ou inscrições, digite *CONTATO* ou *10* para falar com um atendente.
+`.trim();
+  })(),
 };
 
 /**
@@ -175,6 +217,14 @@ const PALAVRAS_CHAVE = {
   solicitar: 'solicitacao_documentos',
   'solicitar documentos': 'solicitacao_documentos',
   'enviar documentos': 'solicitacao_documentos',
+  filiacao: 'filiacao',
+  filiação: 'filiacao',
+  renovar: 'renovacao',
+  renovação: 'renovacao',
+  renovacao: 'renovacao',
+  'quero renovar': 'renovacao',
+  'me filiar': 'filiacao',
+  'quero me filiar': 'filiacao',
   regras: 'regras',
   normas: 'regras',
   localizacao: 'localizacao',
@@ -187,6 +237,15 @@ const PALAVRAS_CHAVE = {
   atendente: 'atendente',
   humano: 'atendente',
   pessoa: 'atendente',
+  provas: 'provas',
+  prova: 'provas',
+  competicao: 'provas',
+  competições: 'provas',
+  competicoes: 'provas',
+  cbtt: 'provas',
+  linade: 'provas',
+  w2c: 'provas',
+  calibre: 'provas',
 };
 
 module.exports = {

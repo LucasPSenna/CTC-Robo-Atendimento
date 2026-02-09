@@ -13,4 +13,17 @@ module.exports = {
   timezone: process.env.TZ || 'America/Sao_Paulo',
   // Mensagem quando estiver fora do horário de atendimento
   mensagemForaHorario: process.env.MENSAGEM_FORA_HORARIO || 'No momento estamos fora do horário de atendimento. Assim que estivermos disponíveis, entraremos em contato. Obrigado!',
+  // PIX: CNPJ para filiação/renovação
+  pixCnpj: process.env.PIX_CNPJ || '31.161.416/0001-15',
+  // Pagamento por link (Infinity Pay): true = envia link de PIX/cartão; false = envia apenas instruções para contato
+  usarPagamentoPorLink: process.env.USAR_PAGAMENTO_LINK !== 'false' && process.env.USAR_PAGAMENTO_LINK !== '0',
+  // Nomes das provas (menu Provas) – personalize no .env
+  provas: {
+    internas: process.env.NOME_PROVA_INTERNAS || 'Provas internas',
+    calibre: process.env.NOME_PROVA_CALIBRE || 'Calibre',
+    cbtt: process.env.NOME_PROVA_CBTT || 'CBTT',
+    w2c: process.env.NOME_PROVA_W2C || 'W2C',
+    linade: process.env.NOME_PROVA_LINADE || 'Linade',
+    federacaoPaulista: process.env.NOME_PROVA_FEDERACAO_PAULISTA || 'Federação Paulista de Tiro Esportivo',
+  },
 };

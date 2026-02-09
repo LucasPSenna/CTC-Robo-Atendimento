@@ -6,6 +6,7 @@ const { MENU_PRINCIPAL, RESPOSTAS, PALAVRAS_CHAVE, OPCOES_SELECAO_IDS } = requir
 const config = require('./config');
 const {
   pediuAtendimentoHumano,
+  getContadorNaoEntendi,
   registrarNaoEntendi,
   zerarContadorNaoEntendi,
   obterMensagemEscalacao,
@@ -25,7 +26,7 @@ function normalizar(texto) {
 }
 
 /**
- * Tenta resolver opção por número (1-7)
+ * Tenta resolver opção por número (1-10)
  */
 function opcaoPorNumero(texto) {
   const n = texto.trim();
@@ -37,7 +38,10 @@ function opcaoPorNumero(texto) {
     '5': 'regras',
     '6': 'localizacao',
     '7': 'solicitacao_documentos',
-    '8': 'atendente',
+    '8': 'renovacao',
+    '9': 'filiacao',
+    '10': 'atendente',
+    '11': 'provas',
   };
   return map[n] || null;
 }
@@ -107,18 +111,21 @@ function processarMensagem(texto, chatId) {
         escalarParaHumano: true,
       };
     }
-    return { texto: RESPOSTAS[chave] || MENU_PRINCIPAL };
+    return { texto: RESPOSTAS[chave] || MENU_PRINCIPAL, chave };
   }
 
-  // Não entendeu
+  // Não entendeu: na primeira vez envia o menu completo; depois envia "não entendi" e eventualmente escala
+  const contadorAntes = getContadorNaoEntendi(chatId);
   const deveEscalar = registrarNaoEntendi(chatId);
+  if (contadorAntes === 0) {
+    return { texto: MENU_PRINCIPAL };
+  }
   if (deveEscalar) {
     return {
       texto: `${config.mensagemPadraoNaoEntendi}\n\nComo não conseguimos ajudar automaticamente, um atendente será acionado. ${RESPOSTAS.atendente}`,
       escalarParaHumano: true,
     };
   }
-
   return {
     texto: config.mensagemPadraoNaoEntendi,
   };

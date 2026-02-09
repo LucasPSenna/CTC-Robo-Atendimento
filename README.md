@@ -41,6 +41,10 @@ copy .env.example .env
 
 - `NOME_CLUBE`: nome do seu clube (aparece no menu).
 - `NUMERO_ATENDIMENTO_HUMANO`: número com DDI+DDD+número (ex: `5511999999999`) para receber avisos quando precisar de atendimento humano.
+- `PIX_CNPJ`: chave PIX em CNPJ para filiação/renovação (padrão: 31.161.416/0001-15).
+- `INFINITYPAY_HANDLE`: usuário Infinity Pay para gerar links no robô (padrão: ctc-clube-de-tiro-de-469). Os links são gerados pela API. O robô envia `max_installments: 4`; se o link ainda permitir 12x (padrão da Infinity Pay), configure no app Infinity Pay em *Checkout / Link de pagamento* o limite de **4 parcelas sem juros**.
+- `USAR_PAGAMENTO_LINK`: use `false` ou `0` para desativar o envio de link de pagamento (renovação/filiação); nesse caso o robô envia apenas instruções para contato com o atendente. Por padrão o link está ativo.
+- **Menu Provas** – nomes personalizáveis no `.env`: `NOME_PROVA_INTERNAS`, `NOME_PROVA_CALIBRE`, `NOME_PROVA_CBTT`, `NOME_PROVA_W2C`, `NOME_PROVA_LINADE`, `NOME_PROVA_FEDERACAO_PAULISTA` (valores padrão: Provas internas, Calibre, CBTT, W2C, Linade, Federação Paulista de Tiro Esportivo).
 
 5. Personalize o conteúdo em **`src/conteudo.js`**: horários, preços, endereço, regras, etc.
 

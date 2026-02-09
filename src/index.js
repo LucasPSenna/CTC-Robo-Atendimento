@@ -17,6 +17,7 @@ const qrcode = require('qrcode-terminal');
 const { processarMensagem, getNumeroAtendimentoHumano } = require('./handlers');
 const { MENU_PRINCIPAL } = require('./conteudo');
 const { estaEmHorarioAtendimento } = require('./horarioAtendimento');
+const { getMensagemPagamento } = require('./infinitepay');
 const config = require('./config');
 
 // Chrome/Chromium: 1) PUPPETEER_EXECUTABLE_PATH (Docker/VPS) 2) Chromium do sistema (VPS) 3) Puppeteer (Render)
@@ -79,10 +80,10 @@ function logEnvio(destinatario, conteudo, tipo = 'resposta') {
   console.log(`[${quando}] ENVIADO (${tipo}) para ${num}: "${preview}${texto.length > 60 ? '...' : ''}"`);
 }
 
-/** Envia o menu em texto. (Lista interativa não é suportada: [LT01] Whatsapp business can't send this yet) */
-async function enviarMenu(chatId, numeroParaLogDestino) {
-  await client.sendMessage(chatId, MENU_PRINCIPAL);
-  logEnvio(numeroParaLogDestino || chatId, MENU_PRINCIPAL, 'menu');
+/** Envia o menu em texto sempre para o mesmo chat que enviou a mensagem (objeto Chat). */
+async function enviarMenu(chat, numeroParaLogDestino) {
+  await chat.sendMessage(MENU_PRINCIPAL);
+  logEnvio(numeroParaLogDestino || chat.id._serialized, MENU_PRINCIPAL, 'menu');
 }
 
 client.on('qr', (qr) => {
@@ -103,19 +104,22 @@ client.on('auth_failure', (msg) => {
 });
 
 client.on('message', async (msg) => {
+  // Ignora mensagens enviadas pelo próprio bot
+  if (msg.fromMe) return;
+
+  // Ignora status/estado (histórias) — o evento "message" dispara para isso e não é chat direto
+  if (msg.isStatus) return;
+
   const chat = await msg.getChat();
   const from = msg.from;
   const body = msg.body || '';
   const isGroup = chat.isGroup;
   const chatId = chat.id._serialized;
 
-  // Só responde em chats privados (evita responder em grupos se não quiser)
-  if (isGroup) {
-    return;
-  }
-
-  // Ignora mensagens enviadas pelo próprio bot
-  if (msg.fromMe) {
+  // Só responde em chats privados 1:1 (não grupo, não status/broadcast)
+  // chatId pode ser 5524998327329@c.us ou, em alguns casos, número@lid — ambos são chat direto
+  const ehStatusOuBroadcast = /status|broadcast/i.test(chatId) || chatId.endsWith('@g.us');
+  if (isGroup || ehStatusOuBroadcast) {
     return;
   }
 
@@ -131,12 +135,12 @@ client.on('message', async (msg) => {
   const textoStr = typeof texto === 'string' ? texto : '';
 
   if (!textoStr && !msg.hasMedia) {
-    await enviarMenu(chatId, numeroLog);
+    await enviarMenu(chat, numeroLog);
     return;
   }
 
   try {
-    const { texto: resposta, escalarParaHumano } = processarMensagem(textoStr, chatId);
+    const { texto: resposta, escalarParaHumano, chave } = processarMensagem(textoStr, chatId);
 
     // Só aplica horário de atendimento quando a opção precisa de atendimento humano
     if (escalarParaHumano && !estaEmHorarioAtendimento()) {
@@ -145,20 +149,26 @@ client.on('message', async (msg) => {
       return;
     }
 
-    if (resposta === MENU_PRINCIPAL) {
-      await enviarMenu(chatId, numeroLog);
-    } else {
-      await msg.reply(resposta);
-      logEnvio(numeroLog, resposta, 'resposta');
+    let mensagemEnviar = resposta;
+    if ((chave === 'renovacao' || chave === 'filiacao') && config.usarPagamentoPorLink) {
+      mensagemEnviar = await getMensagemPagamento(chave);
     }
 
+    if (mensagemEnviar === MENU_PRINCIPAL) {
+      await enviarMenu(chat, numeroLog);
+    } else {
+      await msg.reply(mensagemEnviar);
+      logEnvio(numeroLog, mensagemEnviar, 'resposta');
+    }
+
+    // Notificação de escalação: só para o número configurado (atendente), nunca para o contato que escreveu
     if (escalarParaHumano && getNumeroAtendimentoHumano()) {
-      const numero = getNumeroAtendimentoHumano().replace(/\D/g, '');
-      const destino = numero.includes('@c.us') ? numero : `${numero}@c.us`;
+      const numeroAtendente = getNumeroAtendimentoHumano().replace(/\D/g, '');
+      const destinoAtendente = numeroAtendente.includes('@c.us') ? numeroAtendente : `${numeroAtendente}@c.us`;
       const msgEscalacao = `🔔 *Escalação para atendimento humano*\n\nContato: ${from}\nÚltima mensagem: "${texto.substring(0, 200)}"\n\nVerifique o WhatsApp para atender.`;
       try {
-        await client.sendMessage(destino, msgEscalacao);
-        logEnvio(numero, msgEscalacao, 'escalação');
+        await client.sendMessage(destinoAtendente, msgEscalacao);
+        logEnvio(numeroAtendente, msgEscalacao, 'escalação');
       } catch (e) {
         console.error('Erro ao notificar atendente:', e.message);
       }
