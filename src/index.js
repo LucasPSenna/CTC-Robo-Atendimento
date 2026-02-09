@@ -7,12 +7,29 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { processarMensagem, getNumeroAtendimentoHumano } = require('./handlers');
 
+// No Render (e em outros PaaS sem Chrome instalado), usa o Chromium baixado pelo Puppeteer
+const puppeteerConfig = {
+  headless: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+  ],
+};
+if (process.env.RENDER || process.env.PUPPETEER_EXECUTABLE_PATH) {
+  try {
+    const puppeteer = require('puppeteer');
+    puppeteerConfig.executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+  } catch (e) {
+    console.warn('Puppeteer não encontrado; usando Chrome padrão do sistema.');
+  }
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-  puppeteer: {
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  },
+  puppeteer: puppeteerConfig,
 });
 
 client.on('qr', (qr) => {

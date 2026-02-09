@@ -78,6 +78,23 @@ Projeto Robo Whats/
 - **Nome do clube e número de escalação**: `.env` ou `src/config.js`.
 - **Quantas vezes “não entendi” antes de escalar**: em `src/escalacao.js`, altere `MAX_NAO_ENTENDIDO_PARA_ESCALAR` (padrão: 2).
 
+## Deploy no Render (ou outro PaaS)
+
+O robô usa Puppeteer/Chrome; em servidores como o Render o Chrome não vem instalado. Foi adicionada a dependência `puppeteer` e o código usa o Chromium baixado por ela quando a variável `RENDER` existe.
+
+**No Render, configure:**
+
+1. **Variáveis de ambiente** (Environment):
+   - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` = `false`  
+     (assim o `npm install` baixa o Chromium no build)
+
+2. **Build Command:** `npm install`  
+3. **Start Command:** `node src/index.js`
+
+Na primeira vez após o deploy, abra os **logs** do serviço no Render: o QR Code do WhatsApp é exibido lá. Escaneie com o celular (WhatsApp → Aparelhos conectados). Depois a sessão fica salva no disco do serviço (persistido entre deploys no Render).
+
+---
+
 ## Aviso
 
 O uso de automação no WhatsApp pode violar os termos de uso da plataforma. Use por sua conta e risco e prefira números secundários para testes.
