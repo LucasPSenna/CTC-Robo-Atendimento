@@ -3,6 +3,14 @@
  * Atendimento automatizado; escalação para humano apenas em último caso.
  */
 
+const path = require('path');
+
+// No Render, o cache do Puppeteer precisa ficar DENTRO do projeto para ir no deploy.
+// Configure no Render: PUPPETEER_CACHE_DIR=./cache/puppeteer
+if (process.env.RENDER && !process.env.PUPPETEER_CACHE_DIR) {
+  process.env.PUPPETEER_CACHE_DIR = path.join(process.cwd(), 'cache', 'puppeteer');
+}
+
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { processarMensagem, getNumeroAtendimentoHumano } = require('./handlers');
@@ -31,6 +39,14 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: puppeteerConfig,
 });
+
+/** Log de mensagem enviada: destinatário e prévia do conteúdo */
+function logEnvio(destinatario, conteudo, tipo = 'resposta') {
+  const texto = typeof conteudo === 'string' ? conteudo : '[mídia]';
+  const preview = texto.replace(/\n/g, ' ').slice(0, 60);
+  const quando = new Date().toISOString();
+  console.log(`[${quando}] ENVIADO (${tipo}) para ${destinatario}: "${preview}${texto.length > 60 ? '...' : ''}"`);
+}
 
 client.on('qr', (qr) => {
   console.log('\n📱 Escaneie o QR Code abaixo com o WhatsApp (Dispositivos conectados):\n');
@@ -72,21 +88,22 @@ client.on('message', async (msg) => {
     const { processarMensagem: processar } = require('./handlers');
     const { texto: resp } = processar('menu', chatId);
     await msg.reply(resp);
+    logEnvio(from, resp, 'menu');
     return;
   }
 
   try {
     const { texto: resposta, escalarParaHumano } = processarMensagem(texto, chatId);
     await msg.reply(resposta);
+    logEnvio(from, resposta, 'resposta');
 
     if (escalarParaHumano && getNumeroAtendimentoHumano()) {
       const numero = getNumeroAtendimentoHumano().replace(/\D/g, '');
       const destino = numero.includes('@c.us') ? numero : `${numero}@c.us`;
+      const msgEscalacao = `🔔 *Escalação para atendimento humano*\n\nContato: ${from}\nÚltima mensagem: "${texto.substring(0, 200)}"\n\nVerifique o WhatsApp para atender.`;
       try {
-        await client.sendMessage(
-          destino,
-          `🔔 *Escalação para atendimento humano*\n\nContato: ${from}\nÚltima mensagem: "${texto.substring(0, 200)}"\n\nVerifique o WhatsApp para atender.`
-        );
+        await client.sendMessage(destino, msgEscalacao);
+        logEnvio(destino, msgEscalacao, 'escalação');
       } catch (e) {
         console.error('Erro ao notificar atendente:', e.message);
       }
@@ -94,9 +111,9 @@ client.on('message', async (msg) => {
   } catch (err) {
     console.error('Erro ao processar mensagem:', err);
     try {
-      await msg.reply(
-        'Desculpe, ocorreu um erro. Por favor, tente novamente em instantes ou digite MENU para ver as opções.'
-      );
+      const msgErro = 'Desculpe, ocorreu um erro. Por favor, tente novamente em instantes ou digite MENU para ver as opções.';
+      await msg.reply(msgErro);
+      logEnvio(from, msgErro, 'erro');
     } catch (_) {}
   }
 });

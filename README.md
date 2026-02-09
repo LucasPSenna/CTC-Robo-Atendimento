@@ -87,6 +87,8 @@ O robô usa Puppeteer/Chrome; em servidores como o Render o Chrome não vem inst
 1. **Variáveis de ambiente** (Environment):
    - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` = `false`  
      (assim o `npm install` baixa o Chromium no build)
+   - `PUPPETEER_CACHE_DIR` = `./cache/puppeteer`  
+     (obrigatório: o Chrome é baixado dentro do projeto e entra no deploy; sem isso o executável não é encontrado na hora de rodar)
 
 2. **Build Command:** `npm install`  
 3. **Start Command:** `node src/index.js`
