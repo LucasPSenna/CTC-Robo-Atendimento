@@ -21,13 +21,26 @@ const { getMensagemPagamento } = require('./infinitepay');
 const config = require('./config');
 
 // Chrome/Chromium: 1) PUPPETEER_EXECUTABLE_PATH (Docker/VPS) 2) Chromium do sistema (VPS) 3) Puppeteer (Render)
+// Não usar userDataDir: LocalAuth gerencia o próprio perfil.
+// headless: 'new' evita TargetCloseError no Windows; USE_HEADLESS=false abre a janela (útil para debug).
 const puppeteerConfig = {
-  headless: true,
+  headless: process.env.USE_HEADLESS === 'false' ? false : 'new',
+  timeout: 60000,
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
     '--disable-gpu',
+    '--disable-software-rasterizer',
+    '--disable-extensions',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-background-networking',
+    '--disable-sync',
+    '--disable-features=TranslateUI',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-features=IsolateOrigins,site-per-process',
   ],
 };
 if (process.env.PUPPETEER_EXECUTABLE_PATH) {
@@ -44,6 +57,24 @@ if (process.env.PUPPETEER_EXECUTABLE_PATH) {
       console.warn('Puppeteer não encontrado; usando Chrome padrão do sistema.');
     }
   }
+} else if (process.platform === 'win32') {
+  // No Windows, puppeteer-core (usado pelo whatsapp-web.js) não traz Chrome; usar Chromium do pacote puppeteer ou Chrome instalado.
+  const winChromePaths = [
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  ].filter(Boolean);
+  const foundChrome = winChromePaths.find((p) => { try { return fs.existsSync(p); } catch (_) { return false; } });
+  if (foundChrome) {
+    puppeteerConfig.executablePath = foundChrome;
+  } else {
+    try {
+      const puppeteer = require('puppeteer');
+      puppeteerConfig.executablePath = puppeteer.executablePath();
+    } catch (e) {
+      console.warn('Puppeteer não encontrado. Instale o Google Chrome ou o pacote puppeteer (npm install puppeteer).');
+    }
+  }
 } else if (process.env.RENDER) {
   try {
     const puppeteer = require('puppeteer');
@@ -53,6 +84,9 @@ if (process.env.PUPPETEER_EXECUTABLE_PATH) {
   }
 }
 
+// No Windows: o puppeteer-core do whatsapp-web.js pode causar TargetCloseError. Lançamos o Chrome
+// com o Puppeteer do projeto e passamos o endpoint para o Client conectar (feito em startClient).
+let launchedBrowser = null;
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: puppeteerConfig,
@@ -183,7 +217,41 @@ client.on('message', async (msg) => {
   }
 });
 
-client.initialize().catch((err) => {
+/** No Windows, lança o Chrome com o Puppeteer do projeto e conecta o Client ao endpoint para evitar TargetCloseError. */
+async function startClient() {
+  if (process.platform === 'win32' && process.env.PUPPETEER_SKIP_EXTERNAL !== '1') {
+    try {
+      const puppeteer = require('puppeteer');
+      let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      try {
+        const wwebPath = path.join(require.resolve('whatsapp-web.js'), '..', 'src', 'util', 'Constants.js');
+        userAgent = require(wwebPath).DefaultOptions.userAgent;
+      } catch (_) {}
+      const browserArgs = [
+        ...puppeteerConfig.args,
+        '--disable-blink-features=AutomationControlled',
+        `--user-agent=${userAgent}`,
+      ];
+      launchedBrowser = await puppeteer.launch({
+        headless: puppeteerConfig.headless,
+        timeout: puppeteerConfig.timeout || 60000,
+        executablePath: puppeteerConfig.executablePath || puppeteer.executablePath(),
+        args: browserArgs,
+      });
+      client.options.puppeteer = { browserWSEndpoint: launchedBrowser.wsEndpoint() };
+    } catch (e) {
+      console.warn('Chrome externo não usado:', e.message, '- tentando modo padrão.');
+      if (launchedBrowser) try { await launchedBrowser.close(); } catch (_) {}
+      launchedBrowser = null;
+    }
+  }
+  process.on('exit', () => { if (launchedBrowser) try { launchedBrowser.close(); } catch (_) {} });
+  process.on('SIGINT', () => { if (launchedBrowser) try { launchedBrowser.close(); } catch (_) {} });
+  await client.initialize();
+}
+
+startClient().catch((err) => {
   console.error('Falha ao iniciar cliente:', err);
+  if (launchedBrowser) launchedBrowser.close().catch(() => {});
   process.exit(1);
 });
